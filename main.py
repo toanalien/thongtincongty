@@ -13,12 +13,89 @@ import json
 import os
 from PIL import Image
 from pytesseract import image_to_string
+import requests
+import json
+import hashlib
+import time
+
+import objc
+objc.loadBundle('CoreWLAN',
+                bundle_path='/System/Library/Frameworks/CoreWLAN.framework',
+                module_globals=globals())
+iface = CWInterface.interface()
 
 logging.basicConfig(filename='runtime.log', level=logging.DEBUG)
 logging.basicConfig(format='%(asctime)s %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S %p')
 
 pp = pprint.PrettyPrinter(indent=4)
+
+RouterUrl = "http://tplinkmifi.net"
+ApiEndpoint = "/cgi-bin/web_cgi"
+AuthApiEndpoint = "/cgi-bin/auth_cgi"
+nonce = ""
+
+RouterToken = ""
+RouterPassword = "zaq@123"
+
+
+SSID = 'TP-Link_D807'
+PASS = 'zaq@12345'
+
+
+def getNonce():
+    payload = {"module": "authenticator", "action": 0}
+    r = requests.post(url='{}{}'.format(RouterUrl, AuthApiEndpoint),
+                      data=json.dumps(payload))
+    return r.json()
+
+
+def CalculateMD5Hash(string):
+    return hashlib.md5('{}:{}'.format(string, nonce).encode()).hexdigest()
+
+
+def RestartRouter(token):
+    payload = {"token": token, "module": "reboot", "action": 0}
+    r = requests.post(url='{}{}'.format(RouterUrl, ApiEndpoint),
+                      data=json.dumps(payload))
+    if r.status_code == 200:
+        print(r.json())
+        return r.json()
+    return None
+
+
+def GetRouterToken(digest):
+    payload = {"module": "authenticator", "action": 1, "digest": digest}
+    r = requests.post(url='{}{}'.format(RouterUrl, AuthApiEndpoint),
+                      data=json.dumps(payload))
+    if r.status_code == 200:
+        return r.json()
+    return None
+
+
+
+def checkSSID():
+    return str(iface.ssid()) == SSID
+
+
+def ConnectToWifi():
+    iface.disassociate()
+    networks, error = iface.scanForNetworksWithName_error_(SSID, None)
+
+    network = networks.anyObject()
+    print(network)
+    if not network:
+        return False
+    success, error = iface.associateToNetwork_password_error_(
+        network, PASS, None)
+    print(error)
+    time.sleep(5)
+    print("SSID real ", iface.ssid())
+    time.sleep(5)
+    if str(iface.ssid()) != SSID:
+        return False
+    return True
+
 
 # pp.pprint(getListCity())
 # print(TotalPage())
@@ -44,45 +121,58 @@ pp = pprint.PrettyPrinter(indent=4)
 results = []
 
 
-def getListCompany(url):
-    r = requests.get(url)
-    if r.status_code == 200:
-        soup = BeautifulSoup(r.content, 'html.parser')
-        # print(soup.prettify())
-        searchResults = soup.select('div.search-results a')
-        # for s in searchResults:
-        #     print(s.attrs['href'])
+def getListCompany(province):
+    from json.decoder import JSONDecodeError
+    url = 'http://www.thongtincongty.com/tinh-{}/'.format(province)
 
-        # activeTab = soup.select_one('ul.pagination li.active a')
-        # if activeTab:
-        #     currentPage = int(activeTab.get_text())
-        #     nextPage = currentPage + 1
-        ulPagination = soup.select('ul.pagination li a')
-        lastLi = ulPagination[-1]
-        lastLiHref = lastLi.attrs['href']
-        totalPage = re.findall(
-            '(?<=page\=)(.*?)(?=$)', lastLiHref)[0] if re.findall(
-                '(?<=page\=)(.*?)(?=$)', lastLiHref)[0] else None
-        totalPage = int(totalPage)
-        logging.debug("Total page: " + str(totalPage))
+    filename = 'list-company-{}'.format(province)
 
-        for page in range(1, totalPage + 1):
-            url = 'http://www.thongtincongty.com/tinh-ninh-thuan/?page={}'.format(
-                page)
+    f = open(filename, 'r')
+
+    try:
+        data = json.load(f)
+    except JSONDecodeError:
+        print("cannot read file")
+        data = {}
+
+    f.close()
+    
+    if 'companies' not in data.keys():
+        r = requests.get(url)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.content, 'html.parser')
+            # print(soup.prettify())
+            searchResults = soup.select('div.search-results a')
+            ulPagination = soup.select('ul.pagination li a')
+            lastLi = ulPagination[-1]
+            lastLiHref = lastLi.attrs['href']
+            totalPage = re.findall(
+                '(?<=page\=)(.*?)(?=$)', lastLiHref)[0] if re.findall(
+                    '(?<=page\=)(.*?)(?=$)', lastLiHref)[0] else None
+            totalPage = int(totalPage)
+            logging.debug("Total page: " + str(totalPage))
+            data['totalPage']  = totalPage
+            data['currentPage'] = 1
+            data['companies'] = []
+
+    for page in range(data['currentPage'], data['totalPage'] + 1):
+            print("page " + str(page))
+            url = 'http://www.thongtincongty.com/tinh-{}/?page={}'.format(province, page)
             logging.info(url)
             r = requests.get(url)
             if r.status_code == 200:
                 soup = BeautifulSoup(r.content, 'html.parser')
                 # print(soup.prettify())
                 searchResults = soup.select('div.search-results a')
+                if not searchResults: exit()
                 for s in searchResults:
-                    results.append(s.attrs['href'])
+                    data['companies'].append(s.attrs['href'])
                 logging.info(s.attrs['href'])
-            time.sleep(1)
-        return results
-    return None
-
-
+                data['currentPage'] = page
+            f = open(filename, 'w')
+            json.dump(data, f)
+            f.close()
+        
 # getListCompany()
 
 #
@@ -99,22 +189,11 @@ def getListCompany(url):
 # url = 'http://www.thongtincongty.com/company/4bf570f6-cong-ty-tnhh-thuong-mai-thoi-trang-lbk/'
 
 if __name__ == "__main__":
-    # url = 'http://www.thongtincongty.com/tinh-ninh-thuan/'
-    # filename = 'ninh-thuan'
-    # results = getListCompany(url)
-    # if results:
-    #     results = list(dict.fromkeys(results))
-    #     with open('link.txt', 'a+') as f:
-    #         for i in results:
-    #             f.write(i + '\n')
-    #         f.close()
-    
-    
-    
+    # filename = 'dac-lac'
+    # getListCompany(filename)
     
     # ==============
-    
-    
+
     flink = open('link.txt', 'r')
     arr = flink.readlines()
 
@@ -122,9 +201,9 @@ if __name__ == "__main__":
     if os.path.isfile('temp.json'):
         ftemp = open('temp.json', 'r')
         results = json.load(ftemp)
-    
+
     for idx, link in enumerate(arr):
-        time.sleep(0.5)
+        # time.sleep(0.5)
         # try:
         try:
             print("{}/{}\t{}".format(idx, len(arr), link.strip('\n')))
@@ -145,7 +224,7 @@ if __name__ == "__main__":
                         base64.b64decode(img.attrs['src'].split(
                             'data:image/png;base64,')[1])))
                 phone = image_to_string(img)
-            print ("phone: ", phone)
+            print("phone: ", phone)
             results.append({
                 "phone": phone,
                 "info": info_div.get_text(),
@@ -160,22 +239,53 @@ if __name__ == "__main__":
             with open('temp.json', 'w') as f:
                 json.dump(results, f)
                 f.close()
-            
+
             with open('link.txt', 'w') as f:
                 for i in arr:
                     f.write(i)
                 f.close()
-            exit(0)
-        
-        with open('temp.json', 'w') as f:
-            json.dump(results, f)
-            f.close()
 
-# =======
+            # wifi controller
+            while not checkSSID():
+                iface = CWInterface.interface()
+                iface.disassociate()
+                networks, error = iface.scanForNetworksWithName_error_(
+                    SSID, None)
 
-    # with open('temp.json', 'r') as f:
-    #     data = json.load(f)
-    #     df = pd.DataFrame(data)
-    #     df.to_excel('ninh-thuan.xlsx', index=False, encoding='utf-8')
+                network = networks.anyObject()
+                print(network)
+                if not network:
+                    exit
+                success, error = iface.associateToNetwork_password_error_(
+                    network, PASS, None)
+                time.sleep(10)
 
-    
+            nonce = getNonce()['nonce']
+            hash_password = CalculateMD5Hash(RouterPassword)
+            get_token_result = GetRouterToken(hash_password)
+            print(get_token_result)
+            RestartRouter(get_token_result['token'])
+
+            loop = 1
+            while True:
+                print("try " + str(loop))
+                loop += 1
+                if ConnectToWifi():
+                    break
+                time.sleep(2)
+
+    with open('temp.json', 'w') as f:
+        json.dump(results, f)
+        f.close()
+
+    with open('link.txt', 'w') as f:
+        for i in arr:
+            f.write(i)
+        f.close()
+
+# # =======
+
+#     # with open('temp.json', 'r') as f:
+#     #     data = json.load(f)
+#     #     df = pd.DataFrame(data)
+#     #     df.to_excel('ninh-thuan.xlsx', index=False, encoding='utf-8')
