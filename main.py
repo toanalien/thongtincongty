@@ -19,6 +19,7 @@ import hashlib
 import time
 
 import objc
+from json import JSONDecodeError
 objc.loadBundle('CoreWLAN',
                 bundle_path='/System/Library/Frameworks/CoreWLAN.framework',
                 module_globals=globals())
@@ -128,8 +129,6 @@ def getListCompany(province):
             data = {}
     except FileNotFoundError:
         f = open(filename, 'a')
-    
-    
 
     f.close()
     
@@ -185,10 +184,37 @@ def getListCompany(province):
 # url = 'http://www.thongtincongty.com/company/4bf570f6-cong-ty-tnhh-thuong-mai-thoi-trang-lbk/'
 
 if __name__ == "__main__":
-    filename = 'binh-duong'
-    getListCompany(filename)
+    # define filename
+    province = 'binh-duong'
+
+    # ==============
+
+    # get list company
+    # getListCompany(province)
     
     # ==============
+
+    # convert json arr to txt file
+    # filename = 'list-company-{}'.format(province)
+    # try:
+    #     f = open(filename, 'r')
+    #     try:
+    #         data = json.load(f)
+    #     except JSONDecodeError:
+    #         print("cannot read file")
+    #         exit(1)
+    # except FileNotFoundError:
+    #     exit(1)
+
+    # f2 = open('link.txt', 'a')
+    # for company in data['companies']:
+    #     f2.write('{}\n'.format(company))
+    
+    # f.close()
+    # f2.close()
+
+    # =======================
+
 
     flink = open('link.txt', 'r')
     arr = flink.readlines()
@@ -279,9 +305,9 @@ if __name__ == "__main__":
             f.write(i)
         f.close()
 
-# # # =======
+# # # # =======
 
-# #     # with open('temp.json', 'r') as f:
-# #     #     data = json.load(f)
-# #     #     df = pd.DataFrame(data)
-# #     #     df.to_excel('ninh-thuan.xlsx', index=False, encoding='utf-8')
+# with open('temp.json', 'r') as f:
+#     data = json.load(f)
+#     df = pd.DataFrame(data)
+#     df.to_excel('ninh-thuan.xlsx', index=False, encoding='utf-8')
