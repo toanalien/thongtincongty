@@ -39,9 +39,8 @@ RouterToken = ""
 RouterPassword = "zaq@123"
 
 
-SSID = 'TP-Link_D807'
-PASS = 'zaq@12345'
-
+SSID = 'thien.toan.pro'
+PASS = '88888888'
 
 def getNonce():
     payload = {"module": "authenticator", "action": 0}
@@ -49,10 +48,8 @@ def getNonce():
                       data=json.dumps(payload))
     return r.json()
 
-
 def CalculateMD5Hash(string):
     return hashlib.md5('{}:{}'.format(string, nonce).encode()).hexdigest()
-
 
 def RestartRouter(token):
     payload = {"token": token, "module": "reboot", "action": 0}
@@ -63,7 +60,6 @@ def RestartRouter(token):
         return r.json()
     return None
 
-
 def GetRouterToken(digest):
     payload = {"module": "authenticator", "action": 1, "digest": digest}
     r = requests.post(url='{}{}'.format(RouterUrl, AuthApiEndpoint),
@@ -72,11 +68,8 @@ def GetRouterToken(digest):
         return r.json()
     return None
 
-
-
 def checkSSID():
     return str(iface.ssid()) == SSID
-
 
 def ConnectToWifi():
     iface.disassociate()
@@ -95,7 +88,6 @@ def ConnectToWifi():
     if str(iface.ssid()) != SSID:
         return False
     return True
-
 
 # pp.pprint(getListCity())
 # print(TotalPage())
@@ -127,13 +119,17 @@ def getListCompany(province):
 
     filename = 'list-company-{}'.format(province)
 
-    f = open(filename, 'r')
-
     try:
-        data = json.load(f)
-    except JSONDecodeError:
-        print("cannot read file")
-        data = {}
+        f = open(filename, 'r')
+        try:
+            data = json.load(f)
+        except JSONDecodeError:
+            print("cannot read file")
+            data = {}
+    except FileNotFoundError:
+        f = open(filename, 'a')
+    
+    
 
     f.close()
     
@@ -189,8 +185,8 @@ def getListCompany(province):
 # url = 'http://www.thongtincongty.com/company/4bf570f6-cong-ty-tnhh-thuong-mai-thoi-trang-lbk/'
 
 if __name__ == "__main__":
-    # filename = 'dac-lac'
-    # getListCompany(filename)
+    filename = 'binh-duong'
+    getListCompany(filename)
     
     # ==============
 
@@ -283,9 +279,9 @@ if __name__ == "__main__":
             f.write(i)
         f.close()
 
-# # =======
+# # # =======
 
-#     # with open('temp.json', 'r') as f:
-#     #     data = json.load(f)
-#     #     df = pd.DataFrame(data)
-#     #     df.to_excel('ninh-thuan.xlsx', index=False, encoding='utf-8')
+# #     # with open('temp.json', 'r') as f:
+# #     #     data = json.load(f)
+# #     #     df = pd.DataFrame(data)
+# #     #     df.to_excel('ninh-thuan.xlsx', index=False, encoding='utf-8')
