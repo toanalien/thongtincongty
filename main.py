@@ -224,7 +224,10 @@ if __name__ == "__main__":
         ftemp = open('temp.json', 'r')
         results = json.load(ftemp)
 
-    for idx, link in enumerate(arr):
+    idx = 0
+    while (len(arr)):
+        idx = idx + 1
+        link = arr.pop()
         # time.sleep(0.5)
         # try:
         try:
@@ -252,7 +255,6 @@ if __name__ == "__main__":
                 "info": info_div.get_text(),
             })
             logging.info(link)
-            arr.remove(link)
             # write backup to file json
             # except:
             #     logging.error(link)
